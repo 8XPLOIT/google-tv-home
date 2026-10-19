@@ -7,14 +7,21 @@ devices, but the debloat lists are TCL-specific.
 Nothing is uninstalled: packages are disabled for user 0 (`pm disable-user --user 0`), and
 `tools/restore.sh` puts everything back.
 
+![Home screen with the now-playing card](docs/screenshots/now-playing.jpg)
+
+| | |
+|---|---|
+| ![Home screen](docs/screenshots/home.jpg) | ![All apps, with an HDMI input at the end](docs/screenshots/all-apps.jpg) |
+| Home: wallpaper credit top right, dock at the bottom | All apps, then TV inputs; long-press to add one to the dock |
+
 ## The launcher
 `launcher/` (package `io.github.samuelfonseca.tvhome`): rotating nature wallpapers, a clock,
 and a dock of app tiles. Top-right buttons open All apps and Settings.
 
 - **Dock:** long-press a tile to move it or remove it. Long-press in All apps to add one.
-  Defaults are in `launcher/res/raw/dock.txt`; `input:<id>` lines switch to a TV input such as
-  an HDMI port (ids from `adb shell dumpsys tv_input`). The tile shows the input's name from
-  Settings > Inputs.
+  TV inputs (HDMI ports) are at the end of All apps and can go in the dock too; their tiles show
+  the name from Settings > Inputs. Defaults are in `launcher/res/raw/dock.txt`, where
+  `input:<id>` lines add an input (ids from `adb shell dumpsys tv_input`).
 - **Now playing:** above the dock, a card for whatever plays in the background (Spotify, say):
   art, title, artist, progress, previous / play-pause / next. Select the art to open the app.
   Hidden when nothing is playing or paused. It reads media sessions through a notification

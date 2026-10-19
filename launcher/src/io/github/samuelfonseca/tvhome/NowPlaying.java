@@ -27,6 +27,7 @@ import android.widget.TextView;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -52,14 +53,17 @@ final class NowPlaying extends LinearLayout {
     private final View progress;
     private final Ui.PlayPauseIcon playPauseIcon = new Ui.PlayPauseIcon();
 
-    private MediaController controller;
+    private MediaController controller; // the session on the card
+    private List<MediaController> active = Collections.emptyList(); // all of them, watched
     private String artKey; // URI of the art shown (or loading), so each cover is loaded once
 
     private final MediaSessionManager.OnActiveSessionsChangedListener sessionsChanged = this::update;
 
+    // On every active session, not just the card's: an idle one (Spotify before you press play)
+    // starts playing without the list of sessions changing.
     private final MediaController.Callback callback = new MediaController.Callback() {
-        @Override public void onPlaybackStateChanged(PlaybackState state) { refresh(); }
-        @Override public void onMetadataChanged(MediaMetadata metadata) { refresh(); }
+        @Override public void onPlaybackStateChanged(PlaybackState state) { pick(); }
+        @Override public void onMetadataChanged(MediaMetadata metadata) { pick(); }
         @Override public void onSessionDestroyed() { update(null); }
     };
 
@@ -157,7 +161,8 @@ final class NowPlaying extends LinearLayout {
     /** Stop following; nothing on screen needs updating while Home is in the background. */
     void stop() {
         sessions.removeOnActiveSessionsChangedListener(sessionsChanged);
-        setController(null);
+        watch(null);
+        controller = null;
         main.removeCallbacks(tick);
     }
 
@@ -183,29 +188,31 @@ final class NowPlaying extends LinearLayout {
         main.postDelayed(() -> c.unregisterCallback(cb), KEEP_PLAYING_MS);
     }
 
-    /** Follow the session that's playing, or failing that one that's paused. */
-    private void update(List<MediaController> active) {
-        MediaController pick = null;
-        if (active != null) {
-            for (MediaController c : active) {
-                PlaybackState s = c.getPlaybackState();
-                if (s == null || c.getMetadata() == null) continue;
-                if (isPlaying(s)) {
-                    pick = c;
-                    break;
-                }
-                if (pick == null && s.getState() == PlaybackState.STATE_PAUSED) pick = c;
-            }
-        }
-        setController(pick);
-        refresh();
+    private void update(List<MediaController> list) {
+        watch(list);
+        pick();
     }
 
-    private void setController(MediaController c) {
-        if (controller != null && c != null && controller.getSessionToken().equals(c.getSessionToken())) return;
-        if (controller != null) controller.unregisterCallback(callback);
-        controller = c;
-        if (c != null) c.registerCallback(callback, main);
+    private void watch(List<MediaController> list) {
+        for (MediaController c : active) c.unregisterCallback(callback);
+        active = list == null ? Collections.emptyList() : list;
+        for (MediaController c : active) c.registerCallback(callback, main);
+    }
+
+    /** Show the session that's playing, or failing that one that's paused. */
+    private void pick() {
+        MediaController pick = null;
+        for (MediaController c : active) {
+            PlaybackState s = c.getPlaybackState();
+            if (s == null || c.getMetadata() == null) continue;
+            if (isPlaying(s)) {
+                pick = c;
+                break;
+            }
+            if (pick == null && s.getState() == PlaybackState.STATE_PAUSED) pick = c;
+        }
+        controller = pick;
+        refresh();
     }
 
     private void refresh() {

@@ -46,7 +46,10 @@ final class Apps {
 
     private Apps() {}
 
-    /** Every app with a TV or phone launcher entry, sorted by name. Disabled apps don't appear. */
+    /**
+     * Every app with a TV or phone launcher entry, sorted by name, then the TV's inputs.
+     * Disabled apps don't appear.
+     */
     static List<App> all(Context ctx) {
         PackageManager pm = ctx.getPackageManager();
         List<App> apps = new ArrayList<>();
@@ -55,7 +58,22 @@ final class Apps {
         }
         Collator collator = Collator.getInstance();
         Collections.sort(apps, (a, b) -> collator.compare(a.label, b.label));
+        apps.addAll(inputs(ctx));
         return apps;
+    }
+
+    /** HDMI and other passthrough inputs, except those hidden in Settings > Inputs. */
+    private static List<App> inputs(Context ctx) {
+        List<App> inputs = new ArrayList<>();
+        TvInputManager tim = (TvInputManager) ctx.getSystemService(Context.TV_INPUT_SERVICE);
+        if (tim == null) return inputs;
+        for (TvInputInfo info : tim.getTvInputList()) {
+            // A CEC device gets its own input under its HDMI port's; the port's tile covers it.
+            if (!info.isPassthroughInput() || info.getParentId() != null || info.isHidden(ctx)) continue;
+            App app = input(ctx, INPUT + info.getId());
+            if (app != null) inputs.add(app);
+        }
+        return inputs;
     }
 
     /** One app or input, or null if it isn't installed, is disabled, or has no launcher entry. */

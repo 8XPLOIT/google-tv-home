@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private ImageView back, front;
     private TextView place, credit;
     private LinearLayout dock;
+    private List<String> shownDock; // what buildDock last drew
     private HorizontalScrollView dockScroll;
     private NowPlaying nowPlaying;
     private AlertDialog dialog;
@@ -92,8 +93,10 @@ public class MainActivity extends Activity {
         buildDock();
     }
 
+    // All apps is translucent, so this activity only pauses behind it and onRestart doesn't run.
     @Override protected void onResume() {
         super.onResume();
+        if (!Apps.dock(this).equals(shownDock)) buildDock();
         focusDock(focusedIndex);
     }
 
@@ -217,7 +220,8 @@ public class MainActivity extends Activity {
         // Six cards fill the width; more than that scroll.
         int width = Math.min(Ui.dp(this, 150), (avail - 5 * gap) / 6);
         int i = 0;
-        for (String pkg : Apps.dock(this)) {
+        shownDock = Apps.dock(this);
+        for (String pkg : shownDock) {
             Apps.App app = Apps.get(this, pkg);
             if (app == null) continue; // not installed or disabled
             View tile = Ui.appCard(this, app, width);
