@@ -3,7 +3,6 @@ package io.github.samuelfonseca.tvhome;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.animation.ObjectAnimator;
-import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -11,9 +10,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,9 +33,6 @@ import android.widget.ScrollView;
 import android.widget.TextClock;
 import android.widget.TextView;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -61,8 +58,9 @@ public class MainActivity extends Activity {
     private TextView place, credit;
     private ScrollView page;
     private LinearLayout content;
-    private FrameLayout band; // the dock's frosted background
-    private GradientDrawable bandBg;
+    private FrameLayout band; // the dock's glass panel
+    private Drawable bandBg;
+    private final Glass.Backdrop backdrop = new Glass.Backdrop(); // what the glass panels show
     private LinearLayout dock;
     private List<String> shownDock; // what buildDock last drew
     private List<String> gridDock; // the dock the grid was built without
@@ -73,7 +71,11 @@ public class MainActivity extends Activity {
     private NowPlaying nowPlaying;
     private AlertDialog dialog;
     private int wall;
+    private Highlight highlight;
+    // The dock app to come back to. Kept by package as well as position, so it survives the dock
+    // being rebuilt or reordered.
     private int focusedIndex;
+    private String focusedPkg;
 
     private final Runnable rotate = new Runnable() {
         @Override public void run() {
@@ -91,10 +93,13 @@ public class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        loadWallpaperList();
+        walls.addAll(Wallpapers.list(this));
         setContentView(buildLayout());
         getWindow().getDecorView().getViewTreeObserver()
-                .addOnGlobalFocusChangeListener((was, now) -> scrollFor(now));
+                .addOnGlobalFocusChangeListener((was, now) -> {
+                    scrollFor(now);
+                    followFocus(now);
+                });
         wall = Apps.prefs(this).getInt(KEY_WALL, 0);
         showWallpaper(wall, false);
         buildDock();
@@ -197,12 +202,22 @@ public class MainActivity extends Activity {
             dim.setAlpha(p * 0.85f);
             bandBg.setAlpha(Math.round(255 * (1 - p))); // in the grid the dock is just the top row
             nowPlaying.setAlpha(1 - p); // it sits just above the dock, so it would peek in at the top
+            backdrop.redraw(); // the panels moved over the wallpaper
         });
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
         page.addView(content, new FrameLayout.LayoutParams(-1, -2));
         root.addView(page, new FrameLayout.LayoutParams(-1, -1));
+
+        // One glass frame over the tiles that springs to whichever has focus (see followFocus).
+        // In the page's overlay, so it scrolls with the page and draws over the cards.
+        highlight = new Highlight(Ui.dp(this, 10) * Ui.FOCUS_SCALE, Ui.dp(this, 1), Ui.dp(this, 6));
+        content.getOverlay().add(highlight);
+        content.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            highlight.setBounds(0, 0, r - l, b - t);
+            followFocus(getCurrentFocus()); // tiles may have moved
+        });
 
         int margin = Ui.dp(this, 48);
         int screen = getResources().getDisplayMetrics().heightPixels;
@@ -216,11 +231,11 @@ public class MainActivity extends Activity {
         TextClock time = new TextClock(this);
         time.setFormat12Hour("h:mm");
         time.setFormat24Hour("H:mm");
-        style(time, 46, Ui.LIGHT, 0xFFFFFFFF);
+        Ui.style(time, 46, Ui.LIGHT, 0xFFFFFFFF);
         TextClock date = new TextClock(this);
         date.setFormat12Hour("EEEE, MMMM d");
         date.setFormat24Hour("EEEE, d MMMM");
-        style(date, 15, Ui.MEDIUM, 0xD9FFFFFF);
+        Ui.style(date, 15, Ui.MEDIUM, 0xD9FFFFFF);
         clock.addView(time);
         clock.addView(date);
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
@@ -241,6 +256,9 @@ public class MainActivity extends Activity {
         View settings = Ui.roundButton(this, Ui.gearIcon(), "Settings");
         settings.setOnClickListener(v -> startActivity(
                 new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        // The ends of the row stop the remote, instead of falling through to the nearest tile.
+        Ui.endOfRow(inputs, View.FOCUS_LEFT);
+        Ui.endOfRow(settings, View.FOCUS_RIGHT);
         buttons.addView(inputs);
         for (View b : new View[] {allApps, settings}) {
             LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40));
@@ -250,10 +268,10 @@ public class MainActivity extends Activity {
         // Wrap content, so each row hugs the right edge and the column resizes with the caption.
         right.addView(buttons, new LinearLayout.LayoutParams(-2, -2));
         place = new TextView(this);
-        style(place, 13, Ui.MEDIUM, 0xE6FFFFFF);
+        Ui.style(place, 13, Ui.MEDIUM, 0xE6FFFFFF);
         place.setPadding(0, Ui.dp(this, 16), 0, 0);
         credit = new TextView(this);
-        style(credit, 10, Ui.LIGHT, 0xB3FFFFFF);
+        Ui.style(credit, 10, Ui.LIGHT, 0xB3FFFFFF);
         right.addView(place, new LinearLayout.LayoutParams(-2, -2));
         right.addView(credit, new LinearLayout.LayoutParams(-2, -2));
         FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
@@ -268,22 +286,30 @@ public class MainActivity extends Activity {
 
         // Card and dock share a left edge, and the album art lines up with the first dock card.
         int inset = Ui.dp(this, 32);
-        nowPlaying = new NowPlaying(this, () -> focusDock(focusedIndex));
+        nowPlaying = new NowPlaying(this, () -> focusDock(focusedIndex), glass());
+        backdrop.addPanel(nowPlaying);
         LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-2, -2);
         nlp.setMargins(inset, 0, 0, Ui.dp(this, 16));
         bottom.addView(nowPlaying, nlp);
 
-        // The dock sits on a faint frosted band, like the top row on tvOS.
+        // The dock sits on a glass band, like the top row on tvOS.
         band = new FrameLayout(this);
         band.setClipChildren(false);
-        bandBg = Ui.glass(this);
+        bandBg = glass();
         band.setBackground(bandBg);
+        backdrop.addPanel(band);
         dockScroll = new HorizontalScrollView(this);
         dockScroll.setHorizontalScrollBarEnabled(false);
         dockScroll.setClipChildren(false);
         dockScroll.setClipToPadding(false);
         dockScroll.setFillViewport(true);
-        dockScroll.setPadding(margin - inset, Ui.dp(this, 20), margin - inset, Ui.dp(this, 12));
+        // No names under dock cards, so even padding centres them in the band.
+        dockScroll.setPadding(margin - inset, Ui.dp(this, 18), margin - inset, Ui.dp(this, 18));
+        // A long dock scrolls sideways under the highlight; carry it along rather than chase.
+        dockScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            View f = getCurrentFocus();
+            if (f != null && f.getParent() == dock) highlight.offset(oldX - x, 0);
+        });
         dock = new LinearLayout(this);
         dock.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.TOP);
         dock.setClipChildren(false);
@@ -309,15 +335,14 @@ public class MainActivity extends Activity {
         dock.removeAllViews();
         int gap = Ui.dp(this, 22);
         int width = cardWidth();
-        int i = 0;
         shownDock = Apps.dock(this);
         for (String pkg : shownDock) {
             Apps.App app = Apps.get(this, pkg);
             if (app == null) continue; // not installed or disabled
-            View tile = Ui.appCard(this, app, width);
-            final int index = i++;
+            View tile = Ui.appCard(this, app, width, false);
+            tile.setTag(app.pkg);
+            if (app.pkg.equals(focusedPkg)) focusedIndex = dock.getChildCount();
             tile.setOnClickListener(v -> {
-                focusedIndex = index;
                 Bundle opts = ActivityOptions.makeScaleUpAnimation(
                         v, 0, 0, v.getWidth(), v.getHeight()).toBundle();
                 Apps.launch(this, app.pkg, opts);
@@ -330,8 +355,15 @@ public class MainActivity extends Activity {
             if (dock.getChildCount() > 0) lp.leftMargin = gap;
             dock.addView(tile, lp);
         }
+        // The dock's ends stop the remote: when it fits without scrolling, Android would otherwise
+        // search the whole screen and land on a grid tile or a top button.
+        int n = dock.getChildCount();
+        if (n > 0) {
+            Ui.endOfRow(dock.getChildAt(0), View.FOCUS_LEFT);
+            Ui.endOfRow(dock.getChildAt(n - 1), View.FOCUS_RIGHT);
+        }
         if (!shownDock.equals(gridDock)) buildGrid();
-        focusDock(Math.min(focusedIndex, dock.getChildCount() - 1));
+        focusDock(Math.min(focusedIndex, n - 1));
     }
 
     /** Six cards fill the width; a dock with more than that scrolls. */
@@ -348,7 +380,7 @@ public class MainActivity extends Activity {
         int width = cardWidth();
         for (Apps.App app : Apps.all(this)) {
             if (gridDock.contains(app.pkg)) continue;
-            View tile = Ui.appCard(this, app, width);
+            View tile = Ui.appCard(this, app, width, true);
             tile.setOnClickListener(v -> {
                 Bundle opts = ActivityOptions.makeScaleUpAnimation(
                         v, 0, 0, v.getWidth(), v.getHeight()).toBundle();
@@ -358,11 +390,24 @@ public class MainActivity extends Activity {
                 addToDock(app);
                 return true;
             });
+            // Down lands on the last tile of a shorter row, and stops at the bottom instead of
+            // searching the screen for something lower.
+            tile.setOnKeyListener((v, keyCode, e) -> {
+                if (keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+                int next = Grid.below(grid.indexOfChild(v), grid.getChildCount(), COLUMNS);
+                if (e.getAction() == KeyEvent.ACTION_DOWN && next >= 0) grid.getChildAt(next).requestFocus();
+                return true;
+            });
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
             lp.leftMargin = grid.getChildCount() % COLUMNS == 0 ? 0 : gap;
+            // Each row's ends stop the remote too, rather than jumping to the row above or below.
+            if (grid.getChildCount() % COLUMNS == 0) Ui.endOfRow(tile, View.FOCUS_LEFT);
+            if (grid.getChildCount() % COLUMNS == COLUMNS - 1) Ui.endOfRow(tile, View.FOCUS_RIGHT);
             lp.bottomMargin = Ui.dp(this, 10);
             grid.addView(tile, lp);
         }
+        int n = grid.getChildCount();
+        if (n > 0) Ui.endOfRow(grid.getChildAt(n - 1), View.FOCUS_RIGHT); // a short last row
     }
 
     private void addToDock(Apps.App app) {
@@ -372,7 +417,7 @@ public class MainActivity extends Activity {
                     List<String> pkgs = Apps.dock(this);
                     pkgs.add(app.pkg);
                     Apps.saveDock(this, pkgs);
-                    focusedIndex = pkgs.size() - 1; // land on it in the dock
+                    focusedPkg = app.pkg; // land on it in the dock
                     buildDock();
                 })
                 .show();
@@ -394,12 +439,11 @@ public class MainActivity extends Activity {
         dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(app.label)
                 .setItems(choices, (d, which) -> {
+                    // Focus follows a moved app by package (see buildDock).
                     if (which == 0 && pos > 0) {
                         pkgs.add(pos - 1, pkgs.remove(pos));
-                        focusedIndex = Math.max(0, focusedIndex - 1);
                     } else if (which == 1 && pos < pkgs.size() - 1) {
                         pkgs.add(pos + 1, pkgs.remove(pos));
-                        focusedIndex++;
                     } else if (which == 2) {
                         pkgs.remove(pos);
                     }
@@ -423,7 +467,10 @@ public class MainActivity extends Activity {
      */
     private void scrollFor(View focused) {
         if (focused == null || !isInside(focused, content)) return;
-        if (focused.getParent() == dock) focusedIndex = dock.indexOfChild(focused); // for Back
+        if (focused.getParent() == dock) { // for Back, and for coming back from an app
+            focusedIndex = dock.indexOfChild(focused);
+            focusedPkg = (String) focused.getTag();
+        }
         int target = 0;
         if (isInside(focused, grid)) {
             Rect r = rectIn(focused);
@@ -437,6 +484,23 @@ public class MainActivity extends Activity {
         scroller = ObjectAnimator.ofInt(page, "scrollY", target).setDuration(SCROLL_MS);
         scroller.setInterpolator(new DecelerateInterpolator(2f));
         scroller.start();
+    }
+
+    /** The highlight springs to a focused tile, and fades out anywhere else. */
+    private void followFocus(View focused) {
+        if (focused != null && (focused.getParent() == dock || focused.getParent() == grid)) {
+            highlight.moveTo(cardRect(focused));
+        } else {
+            highlight.hide();
+        }
+    }
+
+    /** A tile's card as it looks focused (scaled up from its centre), in page coordinates. */
+    private RectF cardRect(View tile) {
+        RectF r = new RectF(rectIn(((ViewGroup) tile).getChildAt(0)));
+        float grow = (Ui.FOCUS_SCALE - 1) / 2;
+        r.inset(-r.width() * grow, -r.height() * grow);
+        return r;
     }
 
     /** How far down the page is when the dock sits at the top of the screen. */
@@ -460,28 +524,17 @@ public class MainActivity extends Activity {
 
     // --- Wallpapers ---
 
-    private void loadWallpaperList() {
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(
-                getResources().openRawResource(R.raw.walls)))) {
-            walls.addAll(Lists.wallpapers(r));
-        } catch (IOException ignored) {
-        }
-    }
-
-    /** Decode off the main thread as RGB_565 (half the memory), then crossfade. */
-    @SuppressLint("DiscouragedApi") // wallpapers are named in walls.txt, so looked up by name
+    /** Decode off the main thread, then crossfade. */
     private void showWallpaper(int index, boolean fade) {
         if (walls.isEmpty()) return;
         final int i = ((index % walls.size()) + walls.size()) % walls.size();
         final String[] w = walls.get(i);
-        final int res = getResources().getIdentifier(w[0], "drawable", getPackageName());
         decoder.execute(() -> {
-            BitmapFactory.Options o = new BitmapFactory.Options();
-            o.inPreferredConfig = Bitmap.Config.RGB_565;
-            o.inScaled = false;
-            Bitmap bmp = BitmapFactory.decodeResource(getResources(), res, o);
+            Bitmap bmp = Wallpapers.decode(this, w[0]);
+            Bitmap blurred = bmp == null ? null : Glass.Backdrop.blur(bmp);
             main.post(() -> {
                 if (isDestroyed() || bmp == null) return;
+                backdrop.set(blurred, fade ? FADE_MS : 0);
                 wall = i;
                 Apps.prefs(this).edit().putInt(KEY_WALL, i).apply();
                 place.setText(w[1]);
@@ -501,16 +554,14 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** The glass behind the dock and the now-playing card: 24dp corners, a 1dp edge. */
+    private Glass glass() {
+        return new Glass(backdrop, Ui.dp(this, 24), Math.max(1, Ui.dp(this, 1)));
+    }
+
     private View scrim(GradientDrawable.Orientation o, int color) {
         View v = new View(this);
         v.setBackground(new GradientDrawable(o, new int[] {color, 0x00000000}));
         return v;
-    }
-
-    private static void style(TextView t, float sp, android.graphics.Typeface face, int color) {
-        t.setTextSize(sp);
-        t.setTypeface(face);
-        t.setTextColor(color);
-        t.setShadowLayer(6f, 0, 2f, 0x99000000);
     }
 }

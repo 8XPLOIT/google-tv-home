@@ -74,8 +74,11 @@ final class NowPlaying extends LinearLayout {
         }
     };
 
-    /** {@code onHide} runs when the card disappears while one of its buttons has focus. */
-    NowPlaying(Context ctx, Runnable onHide) {
+    /**
+     * {@code onHide} runs when the card disappears while one of its buttons has focus;
+     * {@code background} is the card's panel.
+     */
+    NowPlaying(Context ctx, Runnable onHide, android.graphics.drawable.Drawable background) {
         super(ctx);
         this.onHide = onHide;
         sessions = (MediaSessionManager) ctx.getSystemService(Context.MEDIA_SESSION_SERVICE);
@@ -89,7 +92,7 @@ final class NowPlaying extends LinearLayout {
         setVisibility(GONE);
         int pad = Ui.dp(ctx, 16);
         setPadding(pad, pad, pad, pad);
-        setBackground(Ui.glass(ctx));
+        setBackground(background);
 
         art = new ImageView(ctx);
         art.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -141,7 +144,10 @@ final class NowPlaying extends LinearLayout {
             if (isPlaying(controller.getPlaybackState())) controller.getTransportControls().pause();
             else controller.getTransportControls().play();
         });
-        addButton(Ui.nextIcon(), "Next", () -> controller.getTransportControls().skipToNext());
+        View next = addButton(Ui.nextIcon(), "Next", () -> controller.getTransportControls().skipToNext());
+        // Ends of the row stop the remote instead of falling through to the dock below.
+        Ui.endOfRow(art, View.FOCUS_LEFT);
+        Ui.endOfRow(next, View.FOCUS_RIGHT);
     }
 
     /** Start following media sessions. Call from onStart. */
@@ -313,7 +319,7 @@ final class NowPlaying extends LinearLayout {
         }
     }
 
-    private void addButton(android.graphics.drawable.Drawable icon, String description, Runnable action) {
+    private View addButton(android.graphics.drawable.Drawable icon, String description, Runnable action) {
         View b = Ui.roundButton(getContext(), icon, description);
         b.setOnClickListener(v -> {
             if (controller != null) action.run();
@@ -321,6 +327,7 @@ final class NowPlaying extends LinearLayout {
         LayoutParams lp = new LayoutParams(Ui.dp(getContext(), 40), Ui.dp(getContext(), 40));
         if (getChildCount() > 2) lp.leftMargin = Ui.dp(getContext(), 12);
         addView(b, lp);
+        return b;
     }
 
     private static boolean isPlaying(PlaybackState s) {

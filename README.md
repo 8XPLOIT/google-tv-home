@@ -7,22 +7,32 @@ devices, but the debloat lists are TCL-specific.
 Nothing is uninstalled: packages are disabled for user 0 (`pm disable-user --user 0`), and
 `tools/restore.sh` puts everything back.
 
-![Home screen with the now-playing card above the dock](docs/screenshots/now-playing.jpg)
+![Home screen: the now-playing card and the dock on glass panels](docs/screenshots/now-playing.jpg)
 
-| | |
-|---|---|
-| ![App grid below the dock](docs/screenshots/app-grid.jpg) | ![All apps, with an HDMI input at the end](docs/screenshots/all-apps.jpg) |
-| Down from the dock: every other app, in a grid | All apps, then TV inputs; long-press to add one to the dock |
+| | | |
+|---|---|---|
+| ![App grid below the dock](docs/screenshots/app-grid.jpg) | ![Screensaver: a photo with the time and credit](docs/screenshots/screensaver.jpg) | ![All apps, with an HDMI input at the end](docs/screenshots/all-apps.jpg) |
+| Down from the dock: every other app, in a grid | Screensaver: the photos, with a clock that moves each minute | All apps, then TV inputs; long-press to add one to the dock |
 
 ## The launcher
 `launcher/` (package `io.github.samuelfonseca.tvhome`): rotating nature wallpapers, a clock,
-and a dock of app tiles on a frosted band. Top-right buttons open the input switcher (Google
+and a dock of app tiles on a glass band. Top-right buttons open the input switcher (Google
 TV's own, `com.android.tv.action.VIEW_INPUTS`), All apps, and Settings.
 
 - **Dock:** long-press a tile to move it or remove it. Long-press in All apps to add one.
 - **App grid:** press down from the dock and the page scrolls up, like tvOS: the dock moves to
   the top, the wallpaper dims, and every app not in the dock follows in a grid. Back returns to
   the dock. Long-press a grid tile to add it to the dock.
+- **Glass:** the dock band and the now-playing card are frosted glass, like tvOS: a blurred copy
+  of the wallpaper lined up with the real one, under a tint, with a fine edge that catches the
+  light (`Glass`; the blur is `Blur`, on a 1/16-size thumbnail). Android only blurs what's behind
+  a view from 12 on, so each panel draws its own.
+- **Focus:** the light on the focused card (`Highlight`: a soft halo, a hairline edge fading down
+  the card, a diagonal sheen) springs from tile to tile across the dock and the grid, and fades
+  out when focus moves to the buttons. Dock cards have no names; grid cards show theirs on focus. Down into a shorter last row lands on its
+  last tile; the bottom row, and the ends of the button and now-playing rows, stop the remote
+  instead of jumping to whatever is nearest. The dock remembers the last app by package, so
+  reordering or rebuilding it keeps your place.
   TV inputs (HDMI ports) are at the end of All apps and can go in the dock too; their tiles show
   the name from Settings > Inputs. Defaults are in `launcher/res/raw/dock.txt`, where
   `input:<id>` lines add an input (ids from `adb shell dumpsys tv_input`).
@@ -42,6 +52,15 @@ TV's own, `com.android.tv.action.VIEW_INPUTS`), All apps, and Settings.
   with a fake keyboard sending Linux key 204 (`Generic.kl` maps it to NOTIFICATION).
 - **Wallpapers:** Wikimedia Commons featured pictures; credits in `launcher/WALLPAPERS.md` and on
   screen.
+- **Screensaver** (optional, `WallpaperDream`): the same photos crossfading every minute, with
+  the time, date and photo credit. The clock moves each minute so nothing burns in. Turn it on,
+  and off again:
+  ```
+  adb shell settings put secure screensaver_components io.github.samuelfonseca.tvhome/.WallpaperDream
+  adb shell settings delete secure screensaver_components
+  ```
+  It starts after the screen-off timeout (`settings get system screen_off_timeout`, 10 minutes by
+  default). `cmd dreams start-dreaming` needs root, so to try it sooner, lower that timeout.
 
 ## Setup
 Needs `adb`, JDK 17 and Android SDK platform 34 + build-tools 34.0.0. `launcher/build.sh`
@@ -116,7 +135,7 @@ Run locally from the repo root; CI (`.github/workflows/ci.yml`) runs the same on
 
 ```
 launcher/build.sh   # build first: lint reads build/classes
-launcher/test.sh    # JUnit on a plain JVM: Lists, Scroll, and the repo's data files
+launcher/test.sh    # JUnit on a plain JVM: Lists, Scroll, Spring, Grid, Blur, and the repo's data files
 launcher/lint.sh    # Android Lint; fails on any warning
 shellcheck tools/*.sh launcher/*.sh
 ```
@@ -124,7 +143,7 @@ shellcheck tools/*.sh launcher/*.sh
 `test.sh` and `lint.sh` download JUnit and a pinned lint release (cmdline-tools 11076708, lint
 8.2.0) into `~/.cache/tvhome`, checking their SHA-256. Newer standalone lint releases crash on
 `{@code}` in doc comments. Only classes with no Android dependency can be unit-tested, so pure
-logic lives in `Lists` and `Scroll`. `RepoFilesTest` also checks that the debloat lists never
+logic lives in `Lists`, `Scroll`, `Spring`, `Grid` and `Blur`. `RepoFilesTest` also checks that the debloat lists never
 disable `launcherx` or `setupwraith` themselves (see [Undo](#undo) for why). CodeQL
 (`.github/workflows/codeql.yml`) scans the Java and the workflows once the repo is public;
 GitHub code scanning isn't available for free on private repos.
