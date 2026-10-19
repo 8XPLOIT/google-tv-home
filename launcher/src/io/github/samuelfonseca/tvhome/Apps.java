@@ -100,7 +100,10 @@ final class Apps {
 
     // Loading labels and art opens each app's APK, so callers only load what they show.
     private static App load(PackageManager pm, String pkg, ResolveInfo ri) {
-        Drawable banner = ri.activityInfo.loadBanner(pm);
+        // Google's Settings banner has a fold line drawn through the middle; use a clean one.
+        Drawable banner = pkg.equals("com.android.tv.settings")
+                ? Ui.iconBanner(Ui.roundGearIcon(), 0xFF50555C, 0xFF2E3236)
+                : ri.activityInfo.loadBanner(pm);
         return new App(pkg, String.valueOf(ri.loadLabel(pm)), banner, banner == null ? ri.loadIcon(pm) : null);
     }
 

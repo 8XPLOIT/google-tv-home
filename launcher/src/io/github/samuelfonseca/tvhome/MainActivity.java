@@ -2,7 +2,9 @@ package io.github.samuelfonseca.tvhome;
 
 import android.app.Activity;
 import android.app.ActivityOptions;
+import android.animation.ObjectAnimator;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -10,17 +12,23 @@ import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextClock;
 import android.widget.TextView;
 
@@ -32,10 +40,15 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** The home screen: rotating nature wallpaper, clock, what's playing, and a dock of favourite apps. */
+/**
+ * The home screen: rotating nature wallpaper, clock, what's playing, and a dock of favourite apps.
+ * Down from the dock scrolls the page up to a grid of every other app, like tvOS.
+ */
 public class MainActivity extends Activity {
     private static final long ROTATE_MS = 60_000;
     private static final long FADE_MS = 1_500;
+    private static final long SCROLL_MS = 350;
+    private static final int COLUMNS = 6; // dock cards and grid columns line up
     private static final String KEY_WALL = "wall";
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -43,10 +56,19 @@ public class MainActivity extends Activity {
     private final List<String[]> walls = new ArrayList<>(); // {resName, place, author, licence}
 
     private ImageView back, front;
+    private View dim;
     private TextView place, credit;
+    private ScrollView page;
+    private LinearLayout content;
+    private FrameLayout band; // the dock's frosted background
+    private GradientDrawable bandBg;
     private LinearLayout dock;
     private List<String> shownDock; // what buildDock last drew
+    private List<String> gridDock; // the dock the grid was built without
     private HorizontalScrollView dockScroll;
+    private GridLayout grid;
+    private ObjectAnimator scroller;
+    private int scrollTarget;
     private NowPlaying nowPlaying;
     private AlertDialog dialog;
     private int wall;
@@ -61,6 +83,7 @@ public class MainActivity extends Activity {
 
     private final BroadcastReceiver packagesChanged = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
+            gridDock = null; // an app came or went: rebuild the grid too
             buildDock();
         }
     };
@@ -69,6 +92,8 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         loadWallpaperList();
         setContentView(buildLayout());
+        getWindow().getDecorView().getViewTreeObserver()
+                .addOnGlobalFocusChangeListener((was, now) -> scrollFor(now));
         wall = Apps.prefs(this).getInt(KEY_WALL, 0);
         showWallpaper(wall, false);
         buildDock();
@@ -97,7 +122,9 @@ public class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         if (!Apps.dock(this).equals(shownDock)) buildDock();
-        focusDock(focusedIndex);
+        // Back from an app opened from the grid: stay where you were.
+        View f = getCurrentFocus();
+        if (f == null || !isInside(f, grid)) focusDock(focusedIndex);
     }
 
     @Override protected void onStop() {
@@ -119,11 +146,12 @@ public class MainActivity extends Activity {
         if (dialog != null) dialog.dismiss();
         focusedIndex = 0;
         dockScroll.smoothScrollTo(0, 0);
-        focusDock(0);
+        focusDock(0); // and the page scrolls back up with it
     }
 
     @Override public void onBackPressed() {
-        // Home is the bottom of the stack; Back does nothing here.
+        // Home is the bottom of the stack; Back only returns from the grid to the dock.
+        if (scrollTarget > 0) focusDock(focusedIndex);
     }
 
     private View buildLayout() {
@@ -144,7 +172,42 @@ public class MainActivity extends Activity {
         root.addView(scrim(GradientDrawable.Orientation.BOTTOM_TOP, 0xB3000000),
                 new FrameLayout.LayoutParams(-1, Ui.dp(this, 230), Gravity.BOTTOM));
 
+        // Darkens the photo as the page scrolls down to the grid.
+        dim = new View(this);
+        dim.setBackgroundColor(0xFF0A0C10);
+        dim.setAlpha(0f);
+        root.addView(dim, new FrameLayout.LayoutParams(-1, -1));
+
+        // Everything else scrolls: the first screen, then the grid. We scroll it ourselves (see
+        // scrollFor), so focus moves don't also nudge it.
+        page = new ScrollView(this) {
+            @Override public boolean executeKeyEvent(KeyEvent event) {
+                return false;
+            }
+
+            @Override protected int computeScrollDeltaToGetChildRectOnScreen(Rect rect) {
+                return 0;
+            }
+        };
+        page.setVerticalScrollBarEnabled(false);
+        page.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        page.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            float p = Math.min(1f, y / (float) Math.max(1, gridScroll()));
+            dim.setAlpha(p * 0.85f);
+            bandBg.setAlpha(Math.round(255 * (1 - p))); // in the grid the dock is just the top row
+            nowPlaying.setAlpha(1 - p); // it sits just above the dock, so it would peek in at the top
+        });
+        content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setClipChildren(false);
+        page.addView(content, new FrameLayout.LayoutParams(-1, -2));
+        root.addView(page, new FrameLayout.LayoutParams(-1, -1));
+
         int margin = Ui.dp(this, 48);
+        int screen = getResources().getDisplayMetrics().heightPixels;
+        FrameLayout first = new FrameLayout(this);
+        first.setClipChildren(false);
+        content.addView(first, new LinearLayout.LayoutParams(-1, screen));
 
         // Top left: time and date.
         LinearLayout clock = new LinearLayout(this);
@@ -161,24 +224,28 @@ public class MainActivity extends Activity {
         clock.addView(date);
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
         clp.setMargins(margin, Ui.dp(this, 28), 0, 0);
-        root.addView(clock, clp);
+        first.addView(clock, clp);
 
-        // Top right: all apps and settings buttons, with the photo credit underneath.
+        // Top right: inputs, all apps and settings buttons, with the photo credit underneath.
         LinearLayout right = new LinearLayout(this);
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.END);
         right.setClipChildren(false); // focused buttons scale past their bounds
         LinearLayout buttons = new LinearLayout(this);
         buttons.setClipChildren(false);
+        View inputs = Ui.roundButton(this, Ui.inputIcon(), "Inputs");
+        inputs.setOnClickListener(v -> openInputs());
         View allApps = Ui.roundButton(this, Ui.gridIcon(), "All apps");
         allApps.setOnClickListener(v -> startActivity(new Intent(this, AllAppsActivity.class)));
         View settings = Ui.roundButton(this, Ui.gearIcon(), "Settings");
         settings.setOnClickListener(v -> startActivity(
                 new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
-        buttons.addView(allApps);
-        LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40));
-        gap.leftMargin = Ui.dp(this, 14);
-        buttons.addView(settings, gap);
+        buttons.addView(inputs);
+        for (View b : new View[] {allApps, settings}) {
+            LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40));
+            gap.leftMargin = Ui.dp(this, 14);
+            buttons.addView(b, gap);
+        }
         // Wrap content, so each row hugs the right edge and the column resizes with the caption.
         right.addView(buttons, new LinearLayout.LayoutParams(-2, -2));
         place = new TextView(this);
@@ -190,35 +257,57 @@ public class MainActivity extends Activity {
         right.addView(credit, new LinearLayout.LayoutParams(-2, -2));
         FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         rlp.setMargins(0, Ui.dp(this, 36), margin, 0);
-        root.addView(right, rlp);
+        first.addView(right, rlp);
 
-        // Above the dock, left: what's playing in the background, with controls.
+        // Bottom of the first screen: what's playing in the background, then the dock.
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.VERTICAL);
+        bottom.setClipChildren(false);
+        first.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+
+        // Card and dock share a left edge, and the album art lines up with the first dock card.
+        int inset = Ui.dp(this, 32);
         nowPlaying = new NowPlaying(this, () -> focusDock(focusedIndex));
-        FrameLayout.LayoutParams nlp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.START);
-        nlp.setMargins(margin, 0, 0, Ui.dp(this, 172));
-        root.addView(nowPlaying, nlp);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-2, -2);
+        nlp.setMargins(inset, 0, 0, Ui.dp(this, 16));
+        bottom.addView(nowPlaying, nlp);
 
-        // Bottom: the dock.
+        // The dock sits on a faint frosted band, like the top row on tvOS.
+        band = new FrameLayout(this);
+        band.setClipChildren(false);
+        bandBg = Ui.glass(this);
+        band.setBackground(bandBg);
         dockScroll = new HorizontalScrollView(this);
         dockScroll.setHorizontalScrollBarEnabled(false);
         dockScroll.setClipChildren(false);
         dockScroll.setClipToPadding(false);
         dockScroll.setFillViewport(true);
-        dockScroll.setPadding(margin, Ui.dp(this, 24), margin, 0);
+        dockScroll.setPadding(margin - inset, Ui.dp(this, 20), margin - inset, Ui.dp(this, 12));
         dock = new LinearLayout(this);
         dock.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.TOP);
         dock.setClipChildren(false);
         dockScroll.addView(dock, new FrameLayout.LayoutParams(-1, -2));
-        root.addView(dockScroll, new FrameLayout.LayoutParams(-1, Ui.dp(this, 160), Gravity.BOTTOM));
+        band.addView(dockScroll, new FrameLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+        blp.setMargins(inset, 0, inset, Ui.dp(this, 24));
+        bottom.addView(band, blp);
+
+        // Below the first screen: every app not in the dock. At least a screen tall, so the
+        // page can always scroll far enough to put the dock at the top.
+        grid = new GridLayout(this);
+        grid.setColumnCount(COLUMNS);
+        grid.setClipChildren(false);
+        grid.setClipToPadding(false);
+        grid.setPadding(margin, 0, margin, Ui.dp(this, 48));
+        grid.setMinimumHeight(screen);
+        content.addView(grid, new LinearLayout.LayoutParams(-1, -2));
         return root;
     }
 
     private void buildDock() {
         dock.removeAllViews();
         int gap = Ui.dp(this, 22);
-        int avail = getResources().getDisplayMetrics().widthPixels - 2 * Ui.dp(this, 48);
-        // Six cards fill the width; more than that scroll.
-        int width = Math.min(Ui.dp(this, 150), (avail - 5 * gap) / 6);
+        int width = cardWidth();
         int i = 0;
         shownDock = Apps.dock(this);
         for (String pkg : shownDock) {
@@ -240,7 +329,61 @@ public class MainActivity extends Activity {
             if (dock.getChildCount() > 0) lp.leftMargin = gap;
             dock.addView(tile, lp);
         }
+        if (!shownDock.equals(gridDock)) buildGrid();
         focusDock(Math.min(focusedIndex, dock.getChildCount() - 1));
+    }
+
+    /** Six cards fill the width; a dock with more than that scrolls. */
+    private int cardWidth() {
+        int gap = Ui.dp(this, 22);
+        int avail = getResources().getDisplayMetrics().widthPixels - 2 * Ui.dp(this, 48);
+        return Math.min(Ui.dp(this, 150), (avail - (COLUMNS - 1) * gap) / COLUMNS);
+    }
+
+    private void buildGrid() {
+        grid.removeAllViews();
+        gridDock = shownDock;
+        int gap = Ui.dp(this, 22);
+        int width = cardWidth();
+        for (Apps.App app : Apps.all(this)) {
+            if (gridDock.contains(app.pkg)) continue;
+            View tile = Ui.appCard(this, app, width);
+            tile.setOnClickListener(v -> {
+                Bundle opts = ActivityOptions.makeScaleUpAnimation(
+                        v, 0, 0, v.getWidth(), v.getHeight()).toBundle();
+                Apps.launch(this, app.pkg, opts);
+            });
+            tile.setOnLongClickListener(v -> {
+                addToDock(app);
+                return true;
+            });
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.leftMargin = grid.getChildCount() % COLUMNS == 0 ? 0 : gap;
+            lp.bottomMargin = Ui.dp(this, 10);
+            grid.addView(tile, lp);
+        }
+    }
+
+    private void addToDock(Apps.App app) {
+        dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(app.label)
+                .setItems(new String[] {"Add to dock"}, (d, which) -> {
+                    List<String> pkgs = Apps.dock(this);
+                    pkgs.add(app.pkg);
+                    Apps.saveDock(this, pkgs);
+                    focusedIndex = pkgs.size() - 1; // land on it in the dock
+                    buildDock();
+                })
+                .show();
+    }
+
+    /** Google TV's input switcher, the panel the remote's Input button opens. */
+    private void openInputs() {
+        try {
+            startActivity(new Intent("com.android.tv.action.VIEW_INPUTS"));
+        } catch (ActivityNotFoundException e) {
+            startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        }
     }
 
     private void editDock(Apps.App app) {
@@ -269,6 +412,50 @@ public class MainActivity extends Activity {
         if (index < 0 || index >= dock.getChildCount()) return;
         View v = dock.getChildAt(index);
         v.post(v::requestFocus);
+    }
+
+    // --- Scrolling between the first screen and the grid ---
+
+    /**
+     * Anything on the first screen shows it whole. In the grid, the dock moves to the top, and
+     * further rows scroll just far enough to keep the focused one on screen.
+     */
+    private void scrollFor(View focused) {
+        if (focused == null || !isInside(focused, content)) return;
+        if (focused.getParent() == dock) focusedIndex = dock.indexOfChild(focused); // for Back
+        int target = 0;
+        if (isInside(focused, grid)) {
+            Rect r = rectIn(focused);
+            int edge = Ui.dp(this, 40);
+            target = Math.max(r.bottom + edge - page.getHeight(), Math.min(scrollTarget, r.top - edge));
+            target = Math.max(target, gridScroll());
+            target = Math.min(target, content.getHeight() - page.getHeight());
+        }
+        if (target == scrollTarget) return;
+        scrollTarget = target;
+        if (scroller != null) scroller.cancel();
+        scroller = ObjectAnimator.ofInt(page, "scrollY", target).setDuration(SCROLL_MS);
+        scroller.setInterpolator(new DecelerateInterpolator(2f));
+        scroller.start();
+    }
+
+    /** How far down the page is when the dock sits at the top of the screen. */
+    private int gridScroll() {
+        return rectIn(band).top - Ui.dp(this, 36);
+    }
+
+    private Rect rectIn(View v) {
+        Rect r = new Rect();
+        v.getDrawingRect(r);
+        content.offsetDescendantRectToMyCoords(v, r);
+        return r;
+    }
+
+    private static boolean isInside(View v, ViewGroup group) {
+        for (Object p = v; p instanceof View; p = ((View) p).getParent()) {
+            if (p == group) return true;
+        }
+        return false;
     }
 
     // --- Wallpapers ---

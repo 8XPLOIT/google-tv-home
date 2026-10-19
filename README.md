@@ -7,18 +7,22 @@ devices, but the debloat lists are TCL-specific.
 Nothing is uninstalled: packages are disabled for user 0 (`pm disable-user --user 0`), and
 `tools/restore.sh` puts everything back.
 
-![Home screen with the now-playing card](docs/screenshots/now-playing.jpg)
+![Home screen with the now-playing card above the dock](docs/screenshots/now-playing.jpg)
 
 | | |
 |---|---|
-| ![Home screen](docs/screenshots/home.jpg) | ![All apps, with an HDMI input at the end](docs/screenshots/all-apps.jpg) |
-| Home: wallpaper credit top right, dock at the bottom | All apps, then TV inputs; long-press to add one to the dock |
+| ![App grid below the dock](docs/screenshots/app-grid.jpg) | ![All apps, with an HDMI input at the end](docs/screenshots/all-apps.jpg) |
+| Down from the dock: every other app, in a grid | All apps, then TV inputs; long-press to add one to the dock |
 
 ## The launcher
 `launcher/` (package `io.github.samuelfonseca.tvhome`): rotating nature wallpapers, a clock,
-and a dock of app tiles. Top-right buttons open All apps and Settings.
+and a dock of app tiles on a frosted band. Top-right buttons open the input switcher (Google
+TV's own, `com.android.tv.action.VIEW_INPUTS`), All apps, and Settings.
 
 - **Dock:** long-press a tile to move it or remove it. Long-press in All apps to add one.
+- **App grid:** press down from the dock and the page scrolls up, like tvOS: the dock moves to
+  the top, the wallpaper dims, and every app not in the dock follows in a grid. Back returns to
+  the dock. Long-press a grid tile to add it to the dock.
   TV inputs (HDMI ports) are at the end of All apps and can go in the dock too; their tiles show
   the name from Settings > Inputs. Defaults are in `launcher/res/raw/dock.txt`, where
   `input:<id>` lines add an input (ids from `adb shell dumpsys tv_input`).

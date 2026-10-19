@@ -87,12 +87,9 @@ final class NowPlaying extends LinearLayout {
         setClipChildren(false);
         setClipToPadding(false);
         setVisibility(GONE);
-        int pad = Ui.dp(ctx, 12);
-        setPadding(pad, pad, Ui.dp(ctx, 16), pad);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x66000000);
-        bg.setCornerRadius(Ui.dp(ctx, 16));
-        setBackground(bg);
+        int pad = Ui.dp(ctx, 16);
+        setPadding(pad, pad, pad, pad);
+        setBackground(Ui.glass(ctx));
 
         art = new ImageView(ctx);
         art.setScaleType(ImageView.ScaleType.CENTER_CROP);
