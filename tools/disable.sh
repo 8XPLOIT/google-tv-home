@@ -3,6 +3,7 @@
 # Usage: tools/disable.sh -f config/debloat.txt
 #        tools/disable.sh com.example.one com.example.two
 set -euo pipefail
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 ensure_connected
 require_backup

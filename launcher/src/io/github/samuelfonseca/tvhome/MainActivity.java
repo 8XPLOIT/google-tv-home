@@ -3,6 +3,7 @@ package io.github.samuelfonseca.tvhome;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.animation.ObjectAnimator;
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -427,9 +428,8 @@ public class MainActivity extends Activity {
         if (isInside(focused, grid)) {
             Rect r = rectIn(focused);
             int edge = Ui.dp(this, 40);
-            target = Math.max(r.bottom + edge - page.getHeight(), Math.min(scrollTarget, r.top - edge));
-            target = Math.max(target, gridScroll());
-            target = Math.min(target, content.getHeight() - page.getHeight());
+            target = Scroll.toShow(scrollTarget, r.top - edge, r.bottom + edge, page.getHeight(),
+                    gridScroll(), content.getHeight() - page.getHeight());
         }
         if (target == scrollTarget) return;
         scrollTarget = target;
@@ -463,16 +463,13 @@ public class MainActivity extends Activity {
     private void loadWallpaperList() {
         try (BufferedReader r = new BufferedReader(new InputStreamReader(
                 getResources().openRawResource(R.raw.walls)))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                String[] parts = line.split("\\|");
-                if (parts.length == 4) walls.add(parts);
-            }
+            walls.addAll(Lists.wallpapers(r));
         } catch (IOException ignored) {
         }
     }
 
     /** Decode off the main thread as RGB_565 (half the memory), then crossfade. */
+    @SuppressLint("DiscouragedApi") // wallpapers are named in walls.txt, so looked up by name
     private void showWallpaper(int index, boolean fade) {
         if (walls.isEmpty()) return;
         final int i = ((index % walls.size()) + walls.size()) % walls.size();

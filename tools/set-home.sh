@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install the launcher and make it the Home app. Undo with tools/restore.sh.
 set -euo pipefail
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 ensure_connected
 require_backup

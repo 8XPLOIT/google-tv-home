@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="io.github.samuelfonseca.tvhome"
     android:versionCode="6"
     android:versionName="1.5">
+
+    <!-- build.sh passes the same values to aapt2; declared here too so Android Lint sees them. -->
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
 
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -22,11 +26,16 @@
         </intent>
     </queries>
 
+    <!-- dataExtractionRules only matters on Android 12+, which is the point (UnusedAttribute).
+         Below 12, allowBackup="false" already turns backup off, so lint's request for
+         fullBackupContent alongside it doesn't apply (DataExtractionRules). -->
     <application
         android:label="Home"
         android:icon="@drawable/banner"
         android:banner="@drawable/banner"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:ignore="DataExtractionRules,UnusedAttribute"
         android:largeHeap="false"
         android:theme="@style/Home">
 
