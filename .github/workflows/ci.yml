@@ -53,7 +53,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: ShellCheck (preinstalled on the runner)
+      # Pinned rather than the runner's copy, so CI and local runs agree.
+      - name: Install ShellCheck 0.11.0
+        run: |
+          curl -sSfLo /tmp/shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
+          echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          echo /tmp/shellcheck-v0.11.0 >> "$GITHUB_PATH"
+      - name: ShellCheck
         run: |
           shellcheck --version
           shellcheck tools/*.sh launcher/*.sh

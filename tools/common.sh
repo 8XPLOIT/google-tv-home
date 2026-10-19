@@ -19,7 +19,10 @@ ensure_connected() {
 
 # Everything that changes the TV logs into a backup, so restore.sh can undo it.
 require_backup() {
-  [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ] || { echo "no backup yet: run tools/backup.sh first" >&2; exit 1; }
+  if [ -z "$BACKUP_DIR" ] || [ ! -d "$BACKUP_DIR" ]; then
+    echo "no backup yet: run tools/backup.sh first" >&2
+    exit 1
+  fi
 }
 
 # Package names from a list file: strip comments and blank lines.
