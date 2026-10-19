@@ -95,6 +95,18 @@ final class Ui {
         return tile;
     }
 
+    /**
+     * The faint frosted panel behind the dock and the now-playing card. Contents inset by 16dp
+     * with 8dp corners sit concentric with its 24dp corners.
+     */
+    static GradientDrawable glass(Context ctx) {
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius(dp(ctx, 24));
+        g.setColor(0x26FFFFFF);
+        g.setStroke(Math.max(1, dp(ctx, 0.75f)), 0x1AFFFFFF);
+        return g;
+    }
+
     /** A small round button for the top bar; white with dark icon when focused. */
     static View roundButton(Context ctx, Drawable icon, String description) {
         int size = dp(ctx, 40);
@@ -132,7 +144,6 @@ final class Ui {
                 ink.setColor(Color.WHITE);
                 ink.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
                 port.setColor(Color.WHITE);
-                port.setStrokeJoin(Paint.Join.ROUND);
             }
 
             @Override public void draw(Canvas c) {
@@ -150,27 +161,8 @@ final class Ui {
                     w = max;
                 }
                 float x = b.exactCenterX() - (iw + gap + w) / 2, cy = b.exactCenterY();
-                drawHdmi(c, x, cy - ih / 2, iw, ih);
+                drawHdmi(c, port, x, cy - ih / 2, iw, ih, ih * 0.13f);
                 c.drawText(text, x + iw + gap, cy - (ink.ascent() + ink.descent()) / 2, ink);
-            }
-
-            /** An HDMI socket face-on: a box with its lower corners cut, and the pin tongue inside. */
-            private void drawHdmi(Canvas c, float x, float y, float w, float h) {
-                float cut = h * 0.4f, stroke = h * 0.13f;
-                Path shell = new Path();
-                shell.moveTo(x, y);
-                shell.lineTo(x + w, y);
-                shell.lineTo(x + w, y + h - cut);
-                shell.lineTo(x + w - cut, y + h);
-                shell.lineTo(x + cut, y + h);
-                shell.lineTo(x, y + h - cut);
-                shell.close();
-                port.setStyle(Paint.Style.STROKE);
-                port.setStrokeWidth(stroke);
-                c.drawPath(shell, port);
-                port.setStyle(Paint.Style.FILL);
-                float inset = stroke + h * 0.14f;
-                c.drawRect(x + inset, y + inset, x + w - inset, y + inset + h * 0.2f, port);
             }
 
             @Override public void setAlpha(int alpha) { bg.setAlpha(alpha); ink.setAlpha(alpha); port.setAlpha(alpha); }
@@ -180,6 +172,61 @@ final class Ui {
                 port.setColorFilter(cf);
             }
             @Override public int getOpacity() { return PixelFormat.OPAQUE; }
+        };
+    }
+
+    /** A 16:9 banner for apps whose own is unusable: a white icon centred on a diagonal gradient. */
+    static Drawable iconBanner(Drawable icon, int from, int to) {
+        return new Drawable() {
+            final Paint bg = new Paint();
+
+            @Override public void draw(Canvas c) {
+                android.graphics.Rect b = getBounds();
+                bg.setShader(new android.graphics.LinearGradient(b.left, b.top, b.right, b.bottom,
+                        from, to, android.graphics.Shader.TileMode.CLAMP));
+                c.drawRect(b, bg);
+                int s = Math.round(b.height() * 0.6f);
+                int x = b.centerX() - s / 2, y = b.centerY() - s / 2;
+                icon.setBounds(x, y, x + s, y + s);
+                icon.draw(c);
+            }
+
+            @Override public void setAlpha(int alpha) { bg.setAlpha(alpha); icon.setAlpha(alpha); }
+            @Override public void setColorFilter(ColorFilter cf) {
+                bg.setColorFilter(cf);
+                icon.setColorFilter(cf);
+            }
+            @Override public int getOpacity() { return PixelFormat.OPAQUE; }
+        };
+    }
+
+    /** An HDMI socket face-on: a box with its lower corners cut, and the pin tongue inside. */
+    private static void drawHdmi(Canvas c, Paint p, float x, float y, float w, float h, float stroke) {
+        float cut = h * 0.4f;
+        Path shell = new Path();
+        shell.moveTo(x, y);
+        shell.lineTo(x + w, y);
+        shell.lineTo(x + w, y + h - cut);
+        shell.lineTo(x + w - cut, y + h);
+        shell.lineTo(x + cut, y + h);
+        shell.lineTo(x, y + h - cut);
+        shell.close();
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(stroke);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        c.drawPath(shell, p);
+        p.setStyle(Paint.Style.FILL);
+        float inset = stroke + h * 0.14f;
+        c.drawRect(x + inset, y + inset, x + w - inset, y + inset + h * 0.2f, p);
+    }
+
+    /** An HDMI port: "inputs". */
+    static Drawable inputIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float iw = w * 0.92f, ih = iw * 0.55f;
+                drawHdmi(c, paint, (w - iw) / 2, (h - ih) / 2, iw, ih, ih * 0.2f);
+            }
         };
     }
 
@@ -214,6 +261,35 @@ final class Ui {
                 Paint clear = new Paint(Paint.ANTI_ALIAS_FLAG);
                 clear.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
                 c.drawCircle(cx, cy, hole, clear);
+            }
+        };
+    }
+
+    /** Six rounded teeth around a large hole, like Google's Settings banner, without its fold line. */
+    static Drawable roundGearIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float cx = w / 2, cy = h / 2, outer = w * 0.5f, body = w * 0.37f;
+                Path p = new Path();
+                for (int i = 0; i < 6; i++) {
+                    double a = Math.toRadians(i * 60 - 90);
+                    point(p, i == 0, cx, cy, body, a - Math.toRadians(20));
+                    point(p, false, cx, cy, outer, a - Math.toRadians(12));
+                    point(p, false, cx, cy, outer, a + Math.toRadians(12));
+                    point(p, false, cx, cy, body, a + Math.toRadians(20));
+                }
+                p.close();
+                paint.setPathEffect(new android.graphics.CornerPathEffect(w * 0.06f));
+                c.drawPath(p, paint);
+                paint.setPathEffect(null);
+                Paint clear = new Paint(Paint.ANTI_ALIAS_FLAG);
+                clear.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
+                c.drawCircle(cx, cy, w * 0.17f, clear);
+            }
+
+            private void point(Path p, boolean first, float cx, float cy, float r, double a) {
+                float x = cx + r * (float) Math.cos(a), y = cy + r * (float) Math.sin(a);
+                if (first) p.moveTo(x, y); else p.lineTo(x, y);
             }
         };
     }
