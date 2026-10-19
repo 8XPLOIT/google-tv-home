@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  launcher:
+    name: Launcher build, tests, lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write # upload Android Lint results to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      # JUnit and the pinned lint release, downloaded by test.sh and lint.sh.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/tvhome
+          key: tvhome-${{ runner.os }}-${{ hashFiles('launcher/test.sh', 'launcher/lint.sh') }}
+      - name: Install SDK platform 34 and build-tools 34.0.0
+        run: '"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-34" "build-tools;34.0.0" >/dev/null'
+      - name: Build
+        run: launcher/build.sh
+      - name: Unit tests
+        run: launcher/test.sh
+      - name: Android Lint
+        run: launcher/lint.sh
+      # Code scanning needs a public repo (or GitHub Advanced Security), and fork PRs can't write to it.
+      - name: Upload lint results to code scanning
+        if: >-
+          always() && hashFiles('launcher/build/lint.sarif') != '' && !github.event.repository.private &&
+          (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: launcher/build/lint.sarif
+          category: android-lint
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: ShellCheck (preinstalled on the runner)
+        run: |
+          shellcheck --version
+          shellcheck tools/*.sh launcher/*.sh

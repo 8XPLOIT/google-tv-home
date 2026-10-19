@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Android Lint settings for lint.sh. Each ignore says why it doesn't apply here. -->
+<lint>
+    <!-- Wallpapers are looked up by name from res/raw/walls.txt (getIdentifier), never by R.drawable. -->
+    <issue id="UnusedResources">
+        <ignore path="res/drawable-nodpi" />
+    </issue>
+    <!-- The launcher is English-only; there are no string resources to translate. -->
+    <issue id="SetTextI18n" severity="ignore" />
+    <!-- NowPlaying is only created in code, never inflated from XML. -->
+    <issue id="ViewConstructor" severity="ignore" />
+</lint>

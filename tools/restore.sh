@@ -2,6 +2,7 @@
 # Undo everything: re-enable every package tools/ disabled, then restore the original Home.
 # Usage: tools/restore.sh [--dry-run] [--remove-launcher] [backups/<timestamp>]
 set -euo pipefail
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
 DRY=0; REMOVE=0

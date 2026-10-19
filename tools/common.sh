@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared settings for the tools/ scripts. Source it, don't run it.
 # Point adb at the TV with ANDROID_SERIAL=<tv-ip>:5555, or leave it unset to use the one device
 # adb already sees (USB or an earlier `adb connect`).
@@ -5,6 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ -z "${ANDROID_SERIAL:-}" ] || export ANDROID_SERIAL
 BACKUP_DIR=""
 [ -f "$ROOT/backups/LATEST" ] && BACKUP_DIR="$ROOT/backups/$(cat "$ROOT/backups/LATEST")"
+# shellcheck disable=SC2034  # used by the scripts that source this
 APPLIED="$BACKUP_DIR/applied.txt"
 
 ensure_connected() {

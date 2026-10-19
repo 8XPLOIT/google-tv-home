@@ -149,11 +149,7 @@ final class Apps {
         }
         try (BufferedReader r = new BufferedReader(new InputStreamReader(
                 ctx.getResources().openRawResource(R.raw.dock)))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                line = line.replaceAll("#.*", "").trim();
-                if (!line.isEmpty()) pkgs.add(line);
-            }
+            pkgs.addAll(Lists.entries(r));
         } catch (IOException ignored) {
         }
         return pkgs;

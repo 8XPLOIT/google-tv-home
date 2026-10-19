@@ -2,6 +2,7 @@
 # Save the TV's current state to backups/<timestamp>/ before changing anything: package lists,
 # all settings, and the current Home. restore.sh reads it. Run once, on the untouched TV.
 set -euo pipefail
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 ensure_connected
 

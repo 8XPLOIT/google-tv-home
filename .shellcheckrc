@@ -1,0 +1,4 @@
+# ShellCheck settings for tools/ and launcher/ scripts.
+# Resolve "# shellcheck source=" paths relative to the script, and follow them.
+source-path=SCRIPTDIR
+external-sources=true

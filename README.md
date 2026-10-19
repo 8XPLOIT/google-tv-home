@@ -111,6 +111,24 @@ network.
   (bootloader locked). Volume has to come from the receiving device, or use HDMI ARC (CEC
   volume works there).
 
+## Checks
+Run locally from the repo root; CI (`.github/workflows/ci.yml`) runs the same on every push and PR.
+
+```
+launcher/build.sh   # build first: lint reads build/classes
+launcher/test.sh    # JUnit on a plain JVM: Lists, Scroll, and the repo's data files
+launcher/lint.sh    # Android Lint; fails on any warning
+shellcheck tools/*.sh launcher/*.sh
+```
+
+`test.sh` and `lint.sh` download JUnit and a pinned lint release (cmdline-tools 11076708, lint
+8.2.0) into `~/.cache/tvhome`, checking their SHA-256. Newer standalone lint releases crash on
+`{@code}` in doc comments. Only classes with no Android dependency can be unit-tested, so pure
+logic lives in `Lists` and `Scroll`. `RepoFilesTest` also checks that the debloat lists never
+disable `launcherx` or `setupwraith` themselves (see [Undo](#undo) for why). CodeQL
+(`.github/workflows/codeql.yml`) scans the Java and the workflows once the repo is public;
+GitHub code scanning isn't available for free on private repos.
+
 ## License
 MIT, see `LICENSE`. The wallpapers in `launcher/res/drawable-nodpi/` are not covered: each keeps
 its own Creative Commons licence or public-domain status, listed in `launcher/WALLPAPERS.md`.
