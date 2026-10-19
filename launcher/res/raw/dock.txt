@@ -1,0 +1,9 @@
+# Default dock, left to right. Long-press a tile on the TV to reorder or remove;
+# that choice is saved on the TV and overrides this list. Apps that aren't installed are skipped.
+# input:<id> switches to a TV input; ids are in `adb shell dumpsys tv_input`.
+com.google.android.youtube.tv
+com.netflix.ninja
+com.disney.disneyplus
+com.hulu.livingroomplus
+com.peacocktv.peacockandroid
+#input:com.mediatek.tvinput/.hdmi.HDMIInputService/HW5  # HDMI 2 on MediaTek-based TCL TVs

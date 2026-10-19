@@ -1,0 +1,296 @@
+package io.github.samuelfonseca.tvhome;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.Outline;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PixelFormat;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+/** Shared look: rounded app cards that lift on focus, round icon buttons, and their icons. */
+final class Ui {
+    static final Typeface LIGHT = Typeface.create("sans-serif-light", Typeface.NORMAL);
+    static final Typeface MEDIUM = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+    private static final DecelerateInterpolator EASE = new DecelerateInterpolator(2f);
+
+    private Ui() {}
+
+    static int dp(Context ctx, float dp) {
+        return Math.round(dp * ctx.getResources().getDisplayMetrics().density);
+    }
+
+    /**
+     * A focusable app card: 16:9 rounded banner with the app name underneath, shown only on
+     * focus. The card scales up and casts a shadow when focused, like tvOS.
+     */
+    static LinearLayout appCard(Context ctx, Apps.App app, int width) {
+        int height = width * 9 / 16;
+        LinearLayout tile = new LinearLayout(ctx);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER_HORIZONTAL);
+        tile.setFocusable(true);
+        tile.setClipChildren(false);
+        tile.setContentDescription(app.label);
+
+        FrameLayout card = new FrameLayout(ctx);
+        card.setClipToOutline(true);
+        int radius = dp(ctx, 10);
+        card.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View v, Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radius);
+            }
+        });
+        ImageView art = new ImageView(ctx);
+        if (app.banner != null) {
+            art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            art.setImageDrawable(app.banner);
+            card.addView(art, new FrameLayout.LayoutParams(-1, -1));
+        } else {
+            // No TV banner: the app icon on a frosted tile.
+            card.setBackgroundColor(0x40FFFFFF);
+            art.setImageDrawable(app.icon);
+            int s = height * 3 / 5;
+            card.addView(art, new FrameLayout.LayoutParams(s, s, Gravity.CENTER));
+        }
+        tile.addView(card, new LinearLayout.LayoutParams(width, height));
+
+        TextView label = new TextView(ctx);
+        label.setText(app.label);
+        label.setTextColor(Color.WHITE);
+        label.setTextSize(13);
+        label.setTypeface(MEDIUM);
+        label.setSingleLine(true);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        label.setGravity(Gravity.CENTER);
+        label.setShadowLayer(dp(ctx, 3), 0, dp(ctx, 1), 0xCC000000);
+        label.setAlpha(0f);
+        // Same width as the card, so the label never pushes neighbouring tiles apart.
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, -2);
+        lp.topMargin = dp(ctx, 12);
+        tile.addView(label, lp);
+
+        tile.setOnFocusChangeListener((v, focused) -> {
+            float s = focused ? 1.12f : 1f;
+            card.setPivotX(width / 2f);
+            card.setPivotY(height / 2f);
+            card.animate().scaleX(s).scaleY(s).translationZ(focused ? dp(ctx, 14) : 0)
+                    .setDuration(160).setInterpolator(EASE).start();
+            label.animate().alpha(focused ? 1f : 0f).translationY(focused ? dp(ctx, 6) : 0)
+                    .setDuration(160).start();
+        });
+        return tile;
+    }
+
+    /** A small round button for the top bar; white with dark icon when focused. */
+    static View roundButton(Context ctx, Drawable icon, String description) {
+        int size = dp(ctx, 40);
+        FrameLayout b = new FrameLayout(ctx);
+        b.setFocusable(true);
+        b.setContentDescription(description);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(0x33FFFFFF);
+        b.setBackground(bg);
+        ImageView iv = new ImageView(ctx);
+        iv.setImageDrawable(icon);
+        int pad = dp(ctx, 10);
+        b.addView(iv, new FrameLayout.LayoutParams(size - 2 * pad, size - 2 * pad, Gravity.CENTER));
+        b.setLayoutParams(new ViewGroup.MarginLayoutParams(size, size));
+        b.setOnFocusChangeListener((v, focused) -> {
+            bg.setColor(focused ? Color.WHITE : 0x33FFFFFF);
+            icon.setTint(focused ? 0xFF111111 : Color.WHITE);
+            v.animate().scaleX(focused ? 1.15f : 1f).scaleY(focused ? 1.15f : 1f).setDuration(140).start();
+        });
+        return b;
+    }
+
+    /**
+     * A 16:9 banner for things without one (TV inputs): an HDMI port and the name in white on a
+     * deep blue.
+     */
+    static Drawable textBanner(String text) {
+        return new Drawable() {
+            final Paint bg = new Paint();
+            final Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
+            final Paint port = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+            {
+                ink.setColor(Color.WHITE);
+                ink.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+                port.setColor(Color.WHITE);
+                port.setStrokeJoin(Paint.Join.ROUND);
+            }
+
+            @Override public void draw(Canvas c) {
+                android.graphics.Rect b = getBounds();
+                bg.setShader(new android.graphics.LinearGradient(b.left, b.top, b.right, b.bottom,
+                        0xFF00246B, 0xFF0070D1, android.graphics.Shader.TileMode.CLAMP));
+                c.drawRect(b, bg);
+
+                // Port, gap, then name, centred as one group.
+                float ih = b.height() * 0.2f, iw = ih * 2.6f, gap = ih * 0.6f;
+                ink.setTextSize(b.height() * 0.3f);
+                float max = b.width() * 0.8f - iw - gap, w = ink.measureText(text);
+                if (w > max) {
+                    ink.setTextSize(ink.getTextSize() * max / w);
+                    w = max;
+                }
+                float x = b.exactCenterX() - (iw + gap + w) / 2, cy = b.exactCenterY();
+                drawHdmi(c, x, cy - ih / 2, iw, ih);
+                c.drawText(text, x + iw + gap, cy - (ink.ascent() + ink.descent()) / 2, ink);
+            }
+
+            /** An HDMI socket face-on: a box with its lower corners cut, and the pin tongue inside. */
+            private void drawHdmi(Canvas c, float x, float y, float w, float h) {
+                float cut = h * 0.4f, stroke = h * 0.13f;
+                Path shell = new Path();
+                shell.moveTo(x, y);
+                shell.lineTo(x + w, y);
+                shell.lineTo(x + w, y + h - cut);
+                shell.lineTo(x + w - cut, y + h);
+                shell.lineTo(x + cut, y + h);
+                shell.lineTo(x, y + h - cut);
+                shell.close();
+                port.setStyle(Paint.Style.STROKE);
+                port.setStrokeWidth(stroke);
+                c.drawPath(shell, port);
+                port.setStyle(Paint.Style.FILL);
+                float inset = stroke + h * 0.14f;
+                c.drawRect(x + inset, y + inset, x + w - inset, y + inset + h * 0.2f, port);
+            }
+
+            @Override public void setAlpha(int alpha) { bg.setAlpha(alpha); ink.setAlpha(alpha); port.setAlpha(alpha); }
+            @Override public void setColorFilter(ColorFilter cf) {
+                bg.setColorFilter(cf);
+                ink.setColorFilter(cf);
+                port.setColorFilter(cf);
+            }
+            @Override public int getOpacity() { return PixelFormat.OPAQUE; }
+        };
+    }
+
+    /** 3x3 dot grid: "all apps". */
+    static Drawable gridIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float r = w / 10f;
+                for (int i = 0; i < 3; i++)
+                    for (int j = 0; j < 3; j++)
+                        c.drawCircle(w * (0.2f + 0.3f * i), h * (0.2f + 0.3f * j), r, paint);
+            }
+        };
+    }
+
+    /** Eight-tooth gear: "settings". */
+    static Drawable gearIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float cx = w / 2, cy = h / 2, outer = w * 0.48f, body = w * 0.36f, hole = w * 0.15f;
+                Path p = new Path();
+                for (int i = 0; i < 8; i++) {
+                    c.save();
+                    c.rotate(i * 45, cx, cy);
+                    c.drawRect(cx - w * 0.08f, cy - outer, cx + w * 0.08f, cy, paint);
+                    c.restore();
+                }
+                p.addCircle(cx, cy, body, Path.Direction.CW);
+                p.addCircle(cx, cy, hole, Path.Direction.CCW);
+                c.drawPath(p, paint);
+                // Punch the hole through the teeth too.
+                Paint clear = new Paint(Paint.ANTI_ALIAS_FLAG);
+                clear.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
+                c.drawCircle(cx, cy, hole, clear);
+            }
+        };
+    }
+
+    /** Bar and triangle pointing left: "previous track". */
+    static Drawable prevIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                c.drawRect(w * 0.12f, h * 0.15f, w * 0.26f, h * 0.85f, paint);
+                c.drawPath(triangle(w * 0.88f, w * 0.26f, h), paint);
+            }
+        };
+    }
+
+    /** Triangle pointing right and a bar: "next track". */
+    static Drawable nextIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                c.drawRect(w * 0.74f, h * 0.15f, w * 0.88f, h * 0.85f, paint);
+                c.drawPath(triangle(w * 0.12f, w * 0.74f, h), paint);
+            }
+        };
+    }
+
+    /** Play triangle, or two pause bars while something is playing. */
+    static final class PlayPauseIcon extends IconDrawable {
+        private boolean playing;
+
+        void setPlaying(boolean playing) {
+            if (this.playing == playing) return;
+            this.playing = playing;
+            invalidateSelf();
+        }
+
+        @Override void draw(Canvas c, float w, float h) {
+            if (playing) {
+                c.drawRect(w * 0.2f, h * 0.12f, w * 0.4f, h * 0.88f, paint);
+                c.drawRect(w * 0.6f, h * 0.12f, w * 0.8f, h * 0.88f, paint);
+            } else {
+                c.drawPath(triangle(w * 0.2f, w * 0.9f, h), paint);
+            }
+        }
+    }
+
+    /** A triangle with its flat side at x = base and its point at x = tip, centred vertically. */
+    private static Path triangle(float base, float tip, float h) {
+        Path p = new Path();
+        p.moveTo(base, h * 0.12f);
+        p.lineTo(tip, h * 0.5f);
+        p.lineTo(base, h * 0.88f);
+        p.close();
+        return p;
+    }
+
+    private abstract static class IconDrawable extends Drawable {
+        final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        IconDrawable() {
+            paint.setColor(Color.WHITE);
+        }
+
+        abstract void draw(Canvas c, float w, float h);
+
+        @Override public void draw(Canvas c) {
+            int save = c.saveLayer(null, null);
+            c.translate(getBounds().left, getBounds().top);
+            draw(c, getBounds().width(), getBounds().height());
+            c.restoreToCount(save);
+        }
+
+        @Override public void setTint(int color) {
+            paint.setColor(color);
+            invalidateSelf();
+        }
+
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(ColorFilter cf) { paint.setColorFilter(cf); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+}

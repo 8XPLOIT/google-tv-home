@@ -1,0 +1,18 @@
+wall_01|Lake Louise, Canada|Chensiyuan|CC BY-SA 4.0
+wall_02|Lake Sils, Switzerland|Hansueli Krapf|CC BY-SA 3.0
+wall_03|Spullersee, Austria|Böhringer Friedrich|CC BY-SA 3.0 at
+wall_04|Lago do Cuniã, Brazil|RodrigoErse|CC BY-SA 4.0
+wall_05|Kathleen Lake, Yukon|Jakub Fryš|CC BY-SA 4.0
+wall_06|Loch Tummel, Scotland|Eric Kilby|CC BY-SA 4.0
+wall_07|Pic du Midi d'Ossau, France|Myrabella|CC BY-SA 3.0
+wall_08|Tennfjorden, Norway|Ximonic (Simo Räsänen)|CC BY-SA 3.0
+wall_09|Dzükou Valley, India|Samudra Bikash Hazarika / UnpetitproleX|CC BY-SA 4.0
+wall_10|Breiðamerkurjökull, Iceland|Jakub Hałun|CC BY 4.0
+wall_11|Flatirons, Colorado|Tyler Cipriani|CC BY-SA 4.0
+wall_12|Gullmarsskogen, Sweden|W.carter|CC0
+wall_13|Birch wood, Belarus|George Chernilevsky|Public domain
+wall_14|Mount Shasta, California|Radomianin|CC BY-SA 4.0
+wall_15|Wilderness|David Marcu|CC0
+wall_16|Vallée de Gavarnie, France|Moahim|CC BY-SA 4.0
+wall_17|Robson Valley, British Columbia|Jakub Fryš|CC BY-SA 4.0
+wall_18|Fanal laurel forest, Madeira|Dietmar Rabich|CC BY-SA 4.0

@@ -1,0 +1,30 @@
+# TCL Google TV (device G13, product G13_2K_US), Android 14, build UKN2.241110.001
+# Apply: tools/disable.sh -f config/debloat.txt   Undo: tools/restore.sh
+# Everything is DISABLED for user 0, never uninstalled.
+# Comment out any line for an app you use. This list keeps Chromecast, Live TV/HDMI inputs,
+# the USB media player and all streaming apps.
+
+# TCL telemetry and ads
+com.tcl.ttvs                       # TCL core service: analytics, account sync (~28 MB RAM)
+com.tcl.partnercustomizer          # sponsored rows / promos for the stock launcher
+com.tcl.messagebox                 # TCL promo message popups
+com.tcl.logkit                     # diagnostic log upload
+
+# Google promo / junk
+android.autoinstalls.config.google.gtvpai   # silently installs promoted apps
+com.google.android.apps.tv.dreamx  # ambient screensaver with recommendations (falls back to basic)
+com.google.android.feedback
+com.google.android.play.games
+
+# Store demo mode
+com.mediatek.MtkDemo
+fusion.android.tv.demo
+
+# Optional: comment these out if you use them
+com.google.android.katniss         # Google Assistant / voice search (~50 MB RAM); mic button stops working
+com.google.android.youtube.tvmusic # YouTube Music
+
+# Stock home screen: disabled only AFTER the new launcher is installed and set as Home
+# (tools/set-home.sh handles these two; listed here so restore covers them)
+#com.google.android.apps.tv.launcherx
+#com.google.android.tungsten.setupwraith  # otherwise hijacks the Home button
