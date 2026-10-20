@@ -27,6 +27,7 @@ import android.widget.TextView;
 final class Ui {
     static final Typeface LIGHT = Typeface.create("sans-serif-light", Typeface.NORMAL);
     static final Typeface MEDIUM = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+    static final Typeface REGULAR = Typeface.create("sans-serif", Typeface.NORMAL);
     /** How much a focused card grows. The home screen's highlight is drawn to match. */
     static final float FOCUS_SCALE = 1.08f;
     private static final DecelerateInterpolator EASE = new DecelerateInterpolator(2f);
@@ -85,7 +86,7 @@ final class Ui {
         // Text and shadow can take the fade's alpha separately; otherwise each frame of it renders
         // the label offscreen first.
         label.forceHasOverlappingRendering(false);
-        // Same width as the card, so the label never pushes neighbouring tiles apart.
+        // Same width as the card, so the label never pushes neighboring tiles apart.
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, -2);
         lp.topMargin = dp(ctx, 12);
         if (labelled) tile.addView(label, lp);
@@ -102,7 +103,7 @@ final class Ui {
         return tile;
     }
 
-    /** Text over a photo: size, face, colour, and a soft shadow so it reads on bright skies. */
+    /** Text over a photo: size, face, color, and a soft shadow so it reads on bright skies. */
     static void style(TextView t, float sp, Typeface face, int color) {
         t.setTextSize(sp);
         t.setTypeface(face);
@@ -191,13 +192,13 @@ final class Ui {
     }
 
     /** What an input tile can show beside its name, in the order its menu lists them. The first is the default. */
-    static final String[] GLYPHS = {"HDMI port", "Game console", "Set-top box", "Disc player", "Computer", "Name only"};
+    static final String[] GLYPHS = {"Input", "HDMI port", "Game console", "Set-top box", "Disc player", "Computer", "Name only"};
 
     /**
      * A 16:9 banner for things without one (TV inputs): a glyph from {@link #GLYPHS} and the name, in
      * white on one of the {@link Palette#TILES} gradients.
      */
-    static Drawable textBanner(String text, String glyph, Palette.Swatch colour) {
+    static Drawable textBanner(String text, String glyph, Palette.Swatch color) {
         return new Drawable() {
             final Paint bg = new Paint();
             final Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -212,10 +213,10 @@ final class Ui {
             @Override public void draw(Canvas c) {
                 android.graphics.Rect b = getBounds();
                 bg.setShader(new android.graphics.LinearGradient(b.left, b.top, b.right, b.bottom,
-                        colour.from, colour.to, android.graphics.Shader.TileMode.CLAMP));
+                        color.from, color.to, android.graphics.Shader.TileMode.CLAMP));
                 c.drawRect(b, bg);
 
-                // Glyph, gap, then name, centred as one group.
+                // Glyph, gap, then name, centered as one group.
                 float[] box = glyphBox(glyph);
                 float ih = b.height() * box[0], iw = ih * box[1], gap = iw > 0 ? b.height() * 0.12f : 0;
                 ink.setTextSize(b.height() * 0.3f);
@@ -245,12 +246,14 @@ final class Ui {
      */
     private static float[] glyphBox(String glyph) {
         switch (glyph) {
-            case "Game console": return new float[] {0.3f, 1.6f};
+            case "Input": return new float[] {0.32f, 1.3f};
+            case "HDMI port": return new float[] {0.2f, 2.6f};
+            case "Game console": return new float[] {0.34f, 1.45f};
             case "Set-top box": return new float[] {0.24f, 2.2f};
             case "Disc player": return new float[] {0.34f, 1f};
             case "Computer": return new float[] {0.34f, 1.3f};
             case "Name only": return new float[] {0, 0};
-            default: return new float[] {0.2f, 2.6f}; // HDMI port
+            default: return new float[] {0.32f, 1.3f}; // Input
         }
     }
 
@@ -260,22 +263,17 @@ final class Ui {
         p.setStrokeJoin(Paint.Join.ROUND);
         switch (glyph) {
             case "Game console": {
-                // A pill with a grip hanging from each end; a d-pad on the left, two buttons on the right.
-                Path pad = new Path(), grips = new Path();
-                float in = stroke / 2; // keep the outline inside the box
-                pad.addRoundRect(x + in, y + in, x + w - in, y + h * 0.66f, h * 0.3f, h * 0.3f, Path.Direction.CW);
-                float r = h * 0.3f;
-                grips.addCircle(x + r + in, y + h - r - in, r, Path.Direction.CW);
-                grips.addCircle(x + w - r - in, y + h - r - in, r, Path.Direction.CW);
-                pad.op(grips, Path.Op.UNION);
+                // A modern controller: a wide body flaring into rounded grips, a d-pad on the left
+                // and two buttons on the right.
+                float in = stroke / 2;
                 p.setStyle(Paint.Style.STROKE);
-                c.drawPath(pad, p);
+                c.drawPath(controller(x + in, y + in, w - stroke, h - stroke), p);
                 p.setStyle(Paint.Style.FILL);
-                float dx = x + w * 0.27f, dy = y + h * 0.36f, arm = h * 0.15f, t = h * 0.055f;
+                float dx = x + w * 0.27f, dy = y + h * 0.36f, arm = h * 0.14f, t = h * 0.05f;
                 c.drawRect(dx - arm, dy - t, dx + arm, dy + t, p);
                 c.drawRect(dx - t, dy - arm, dx + t, dy + arm, p);
-                c.drawCircle(x + w * 0.67f, y + h * 0.42f, h * 0.065f, p);
-                c.drawCircle(x + w * 0.78f, y + h * 0.27f, h * 0.065f, p);
+                c.drawCircle(x + w * 0.68f, y + h * 0.42f, h * 0.07f, p);
+                c.drawCircle(x + w * 0.78f, y + h * 0.27f, h * 0.07f, p);
                 break;
             }
             case "Set-top box": {
@@ -311,14 +309,73 @@ final class Ui {
                 c.drawRoundRect(cx - w * 0.26f, y + h * 0.88f, cx + w * 0.26f, y + h, stroke / 2, stroke / 2, p);
                 break;
             }
+            case "HDMI port":
+                drawHdmi(c, p, x, y, w, h, stroke);
+                break;
             case "Name only":
                 break;
             default:
-                drawHdmi(c, p, x, y, w, h, stroke);
+                drawInput(c, p, x, y, w, h, stroke);
         }
     }
 
-    /** A 16:9 banner for apps whose own is unusable: a white icon centred on a diagonal gradient. */
+    /** A controller's outline filling the box at x, y: flat across the top, grips curling down at each end. */
+    private static Path controller(float x, float y, float w, float h) {
+        float[] v = {
+            // start, then three points per curve; straight lines repeat their end point
+            0.26f, 0.04f,
+            0.26f, 0.04f, 0.74f, 0.04f, 0.74f, 0.04f,
+            0.87f, 0.04f, 0.94f, 0.12f, 0.965f, 0.28f,
+            0.99f, 0.46f, 1f, 0.68f, 0.985f, 0.84f,
+            0.97f, 0.97f, 0.83f, 1f, 0.77f, 0.91f,
+            0.77f, 0.91f, 0.67f, 0.75f, 0.67f, 0.75f,
+            0.645f, 0.715f, 0.62f, 0.7f, 0.58f, 0.7f,
+            0.58f, 0.7f, 0.42f, 0.7f, 0.42f, 0.7f,
+            0.38f, 0.7f, 0.355f, 0.715f, 0.33f, 0.75f,
+            0.33f, 0.75f, 0.23f, 0.91f, 0.23f, 0.91f,
+            0.17f, 1f, 0.03f, 0.97f, 0.015f, 0.84f,
+            0f, 0.68f, 0.01f, 0.46f, 0.035f, 0.28f,
+            0.06f, 0.12f, 0.13f, 0.04f, 0.26f, 0.04f,
+        };
+        Path path = new Path();
+        path.moveTo(x + w * v[0], y + h * v[1]);
+        for (int i = 2; i < v.length; i += 6) {
+            path.cubicTo(x + w * v[i], y + h * v[i + 1], x + w * v[i + 2], y + h * v[i + 3],
+                    x + w * v[i + 4], y + h * v[i + 5]);
+        }
+        path.close();
+        return path;
+    }
+
+    /** An arrow into a box that's open on the left where it enters: Google's "input". */
+    private static void drawInput(Canvas c, Paint p, float x, float y, float w, float h, float stroke) {
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(stroke);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        float in = stroke / 2, l = x + w * 0.3f, r = x + w - in, t = y + in, b = y + h - in, k = h * 0.16f;
+        Path box = new Path();
+        box.moveTo(l, y + h * 0.3f);
+        box.lineTo(l, t + k);
+        box.quadTo(l, t, l + k, t);
+        box.lineTo(r - k, t);
+        box.quadTo(r, t, r, t + k);
+        box.lineTo(r, b - k);
+        box.quadTo(r, b, r - k, b);
+        box.lineTo(l + k, b);
+        box.quadTo(l, b, l, b - k);
+        box.lineTo(l, y + h * 0.7f);
+        float cy = y + h / 2, tip = x + w * 0.68f, head = h * 0.2f;
+        box.moveTo(x + in, cy);
+        box.lineTo(tip, cy);
+        box.moveTo(tip - head, cy - head);
+        box.lineTo(tip, cy);
+        box.lineTo(tip - head, cy + head);
+        c.drawPath(box, p);
+        p.setStrokeCap(Paint.Cap.BUTT); // as the other glyphs expect
+    }
+
+    /** A 16:9 banner for apps whose own is unusable: a white icon centered on a diagonal gradient. */
     static Drawable iconBanner(Drawable icon, int from, int to) {
         return new Drawable() {
             final Paint bg = new Paint();
@@ -363,12 +420,12 @@ final class Ui {
         c.drawRect(x + inset, y + inset, x + w - inset, y + inset + h * 0.2f, p);
     }
 
-    /** An HDMI port: "inputs". */
+    /** An arrow into a box: "inputs". */
     static Drawable inputIcon() {
         return new IconDrawable() {
             @Override void draw(Canvas c, float w, float h) {
-                float iw = w * 0.92f, ih = iw * 0.55f;
-                drawHdmi(c, paint, (w - iw) / 2, (h - ih) / 2, iw, ih, ih * 0.2f);
+                float iw = w * 0.94f, ih = iw * 0.76f;
+                drawInput(c, paint, (w - iw) / 2, (h - ih) / 2, iw, ih, w * 0.09f);
             }
         };
     }
@@ -391,6 +448,171 @@ final class Ui {
                 round.addCircle(cx, cy, body, Path.Direction.CW);
                 gear.op(round, Path.Op.UNION);
                 c.drawPath(punch(gear, cx, cy, hole), paint);
+            }
+        };
+    }
+
+    /** Three sliders: "preferences". */
+    static Drawable tuneIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                paint.setStyle(Paint.Style.FILL);
+                float t = h * 0.09f, r = h * 0.13f;
+                float[] ys = {0.22f, 0.5f, 0.78f}, knobs = {0.68f, 0.32f, 0.58f};
+                for (int i = 0; i < ys.length; i++) {
+                    float y = h * ys[i];
+                    c.drawRoundRect(w * 0.06f, y - t / 2, w * 0.94f, y + t / 2, t / 2, t / 2, paint);
+                    c.drawCircle(w * knobs[i], y, r, paint);
+                }
+            }
+        };
+    }
+
+    /** A framed landscape, mountains under a sun: "background". */
+    static Drawable photoIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float t = w * 0.08f;
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(t);
+                c.drawRoundRect(t / 2, h * 0.14f, w - t / 2, h * 0.86f, w * 0.1f, w * 0.1f, paint);
+                paint.setStyle(Paint.Style.FILL);
+                Path hills = new Path();
+                hills.moveTo(w * 0.18f, h * 0.74f);
+                hills.lineTo(w * 0.4f, h * 0.44f);
+                hills.lineTo(w * 0.56f, h * 0.64f);
+                hills.lineTo(w * 0.66f, h * 0.53f);
+                hills.lineTo(w * 0.82f, h * 0.74f);
+                hills.close();
+                c.drawPath(hills, paint);
+                c.drawCircle(w * 0.68f, h * 0.34f, w * 0.07f, paint);
+            }
+        };
+    }
+
+    /** Four rounded squares: "categories". */
+    static Drawable gridIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                paint.setStyle(Paint.Style.FILL);
+                float s = w * 0.36f, gap = w * 0.12f, x = (w - 2 * s - gap) / 2, y = (h - 2 * s - gap) / 2;
+                for (int i = 0; i < 4; i++) {
+                    float l = x + (i % 2) * (s + gap), t = y + (i / 2) * (s + gap);
+                    c.drawRoundRect(l, t, l + s, t + s, s * 0.25f, s * 0.25f, paint);
+                }
+            }
+        };
+    }
+
+    /** A clock face at ten past: "how often". */
+    static Drawable clockIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float t = w * 0.09f, cx = w / 2, cy = h / 2;
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(t);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                c.drawCircle(cx, cy, w / 2 - t / 2, paint);
+                c.drawLine(cx, cy, cx, h * 0.24f, paint);
+                c.drawLine(cx, cy, w * 0.68f, h * 0.6f, paint);
+            }
+        };
+    }
+
+    /** An arrow pointing left, or right: "move". */
+    static Drawable arrowIcon(boolean left) {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float t = w * 0.1f, tip = left ? w * 0.16f : w * 0.84f, back = left ? 1 : -1;
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(t);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setStrokeJoin(Paint.Join.ROUND);
+                c.drawLine(w * 0.16f, h / 2, w * 0.84f, h / 2, paint);
+                Path head = new Path();
+                head.moveTo(tip + back * w * 0.3f, h * 0.2f);
+                head.lineTo(tip, h / 2);
+                head.lineTo(tip + back * w * 0.3f, h * 0.8f);
+                c.drawPath(head, paint);
+            }
+        };
+    }
+
+    /** A plus: "add"; or just its bar, a minus: "remove". */
+    static Drawable plusIcon(boolean minus) {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                paint.setStyle(Paint.Style.FILL);
+                float t = w * 0.11f, r = t / 2;
+                c.drawRoundRect(w * 0.14f, (h - t) / 2, w * 0.86f, (h + t) / 2, r, r, paint);
+                if (!minus) c.drawRoundRect((w - t) / 2, h * 0.14f, (w + t) / 2, h * 0.86f, r, r, paint);
+            }
+        };
+    }
+
+    /** A bin with its lid: "uninstall". */
+    static Drawable binIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float t = w * 0.09f;
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(t);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setStrokeJoin(Paint.Join.ROUND);
+                c.drawLine(w * 0.12f, h * 0.24f, w * 0.88f, h * 0.24f, paint);
+                c.drawLine(w * 0.4f, h * 0.1f, w * 0.6f, h * 0.1f, paint);
+                Path body = new Path();
+                body.moveTo(w * 0.22f, h * 0.24f);
+                body.lineTo(w * 0.28f, h * 0.9f);
+                body.lineTo(w * 0.72f, h * 0.9f);
+                body.lineTo(w * 0.78f, h * 0.24f);
+                c.drawPath(body, paint);
+                c.drawLine(w * 0.43f, h * 0.42f, w * 0.43f, h * 0.72f, paint);
+                c.drawLine(w * 0.57f, h * 0.42f, w * 0.57f, h * 0.72f, paint);
+            }
+        };
+    }
+
+    /** A crescent moon: "screensaver". */
+    static Drawable moonIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                paint.setStyle(Paint.Style.FILL);
+                Path moon = new Path(), bite = new Path();
+                moon.addCircle(w * 0.46f, h * 0.54f, w * 0.4f, Path.Direction.CW);
+                bite.addCircle(w * 0.72f, h * 0.32f, w * 0.34f, Path.Direction.CW);
+                moon.op(bite, Path.Op.DIFFERENCE);
+                c.drawPath(moon, paint);
+            }
+        };
+    }
+
+    /** A drop of paint: "color". */
+    static Drawable dropIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                paint.setStyle(Paint.Style.FILL);
+                float cx = w / 2;
+                Path drop = new Path();
+                drop.moveTo(cx, h * 0.06f);
+                drop.cubicTo(cx + w * 0.42f, h * 0.48f, cx + w * 0.36f, h * 0.94f, cx, h * 0.94f);
+                drop.cubicTo(cx - w * 0.36f, h * 0.94f, cx - w * 0.42f, h * 0.48f, cx, h * 0.06f);
+                c.drawPath(drop, paint);
+            }
+        };
+    }
+
+    /** A ringed "i": "app info". */
+    static Drawable infoIcon() {
+        return new IconDrawable() {
+            @Override void draw(Canvas c, float w, float h) {
+                float t = w * 0.09f, cx = w / 2;
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(t);
+                c.drawCircle(cx, h / 2, w / 2 - t / 2, paint);
+                paint.setStyle(Paint.Style.FILL);
+                c.drawCircle(cx, h * 0.3f, t * 0.8f, paint);
+                c.drawRoundRect(cx - t / 2, h * 0.43f, cx + t / 2, h * 0.74f, t / 2, t / 2, paint);
             }
         };
     }
@@ -425,7 +647,7 @@ final class Ui {
     }
 
     /**
-     * {@code shape} with a round hole through its centre. Cut from the path rather than cleared
+     * {@code shape} with a round hole through its center. Cut from the path rather than cleared
      * after drawing, which would need an offscreen layer every time the icon is drawn.
      */
     private static Path punch(Path shape, float cx, float cy, float r) {
@@ -475,7 +697,7 @@ final class Ui {
         }
     }
 
-    /** A triangle with its flat side at x = base and its point at x = tip, centred vertically. */
+    /** A triangle with its flat side at x = base and its point at x = tip, centered vertically. */
     private static Path triangle(float base, float tip, float h) {
         Path p = new Path();
         p.moveTo(base, h * 0.12f);
