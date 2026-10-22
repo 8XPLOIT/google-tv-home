@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -36,6 +37,13 @@ jobs:
         run: launcher/test.sh
       - name: Android Lint
         run: launcher/lint.sh
+      - name: Upload launcher APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tcl-google-tv-launcher
+          path: launcher/build/tvhome.apk
+          if-no-files-found: error
+          retention-days: 14
       # Code scanning needs a public repo (or GitHub Advanced Security), and fork PRs can't write to it.
       - name: Upload lint results to code scanning
         if: >-
